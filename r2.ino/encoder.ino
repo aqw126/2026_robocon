@@ -1,4 +1,4 @@
-#include <Arduino.h>
+#include "robot_types.h"
 
 // MOTORピンと重複しない仮ピン。実配線に合わせて変更すること。
 // ENCODER_COUNTS_PER_WHEEL_REV はA相立上りで得られる車輪1回転当たりの実カウント数。

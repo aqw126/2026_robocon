@@ -1,30 +1,12 @@
-#include <Arduino.h>
-#include <math.h>
-
-// 座標系: x=前方, y=左方, 角速度w=反時計回り。単位: m, s, rad
-// 車輪順: 0=右下(π/3), 1=左下(2π/3), 2=正面(π)
-constexpr float kPi = 3.14159265358979323846f;
-namespace config {
-constexpr uint8_t wheel_count = 3;
-constexpr float wheel_radius_m = 0.050f;       // 実測値に変更
-constexpr float mount_radius_m = 0.150f;       // 機体中心から車輪まで
-constexpr float mount_offset[wheel_count] = {kPi / 3.0f, 2.0f * kPi / 3.0f, kPi};
-constexpr float max_wheel_speed_mps = 1.0f;
-}
+#include "robot_types.h"
 
 // IN: 方向、PWM: 速度入力を想定。実配線に合わせて確認・変更すること。
-constexpr int MOTOR_IN[config::wheel_count] = {4, 6, 15};
-constexpr int MOTOR_PWM[config::wheel_count] = {5, 7, 16};
+constexpr int MOTOR_IN[config::wheel_count] = {15, 17, 6};
+constexpr int MOTOR_PWM[config::wheel_count] = {16, 18, 7};
 constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
 constexpr uint32_t MOTOR_PWM_FREQ_HZ = 20000;
 constexpr uint8_t MOTOR_PWM_BITS = 8;
 constexpr int MOTOR_PWM_MAX = (1 << MOTOR_PWM_BITS) - 1;
-
-struct BodyTwist { float vx, vy, w; };
-struct WheelSpeeds { float v_wheel[config::wheel_count] = {}; };
-struct Pose2D { float x_m = 0.0f, y_m = 0.0f, heading_rad = 0.0f; };
-
-extern float wheelSpeedMps[config::wheel_count];
 
 // 逆運動学: 機体速度 -> 各車輪の接線速度
 WheelSpeeds inverse(const BodyTwist &t) {
