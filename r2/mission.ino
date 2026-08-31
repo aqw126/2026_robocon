@@ -21,18 +21,18 @@ enum MissionState {
   ERROR_STOP,
 };
 
-// 添付図の4500mm x 2400mmフィールドから設定した、各ゾーンの安全な内側の仮中心。
-// 実コートでメジャー測定後に更新すること。単位はm。
+// 添付図の4500mm x 2400mmフィールドから読み取った各ゾーンの中心。
+// 左下原点。図面寸法に±5%の公差があるため、実コートで最終確認すること。単位はm。
 constexpr float FIELD_WIDTH_M = 4.500f;
 constexpr float FIELD_HEIGHT_M = 2.400f;
-constexpr float R2_START_X_M = 2.350f;
+constexpr float R2_START_X_M = 2.050f;
 constexpr float R2_START_Y_M = 0.250f;
-constexpr float GARDEN_X_M = 3.100f;
+constexpr float GARDEN_X_M = 3.900f;
 constexpr float GARDEN_Y_M = 1.200f;
-constexpr float WAREHOUSE_A_X_M = 0.600f;
-constexpr float WAREHOUSE_A_Y_M = 1.650f;
-constexpr float WAREHOUSE_C_X_M = 1.350f;
-constexpr float WAREHOUSE_C_Y_M = 0.350f;
+constexpr float WAREHOUSE_A_X_M = 0.500f;
+constexpr float WAREHOUSE_A_Y_M = 2.025f;
+constexpr float WAREHOUSE_C_X_M = 1.400f;
+constexpr float WAREHOUSE_C_Y_M = 0.375f;
 
 // 電源投入後に最初に行う仮動作: 機体前方へ0.20m/sで3秒間進む。
 constexpr float INITIAL_ACTION_VX_MPS = 0.20f;
