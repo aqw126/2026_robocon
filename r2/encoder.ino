@@ -1,11 +1,11 @@
 #include "robot_types.h"
 
-// MOTORピンと重複しない仮ピン。実配線に合わせて変更すること。
+// エンコーダー1は実配線。エンコーダー2・3はピン情報待ちの仮値。
 // ENCODER_COUNTS_PER_WHEEL_REV はA相立上りで得られる車輪1回転当たりの実カウント数。
-constexpr int ENC_A[config::wheel_count] = {1, 9, 11};
-constexpr int ENC_B[config::wheel_count] = {2, 10, 12};
+constexpr int ENC_A[config::wheel_count] = {2, 9, 11};
+constexpr int ENC_B[config::wheel_count] = {1, 10, 12};
 constexpr int ENCODER_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
-constexpr float ENCODER_COUNTS_PER_WHEEL_REV = 500.0f;
+constexpr float ENCODER_COUNTS_PER_WHEEL_REV = 1440.0f;
 constexpr uint32_t ENCODER_UPDATE_INTERVAL_US = 10000;
 
 volatile int32_t encoderCount[config::wheel_count] = {0, 0, 0};

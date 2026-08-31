@@ -1,12 +1,19 @@
 #include "robot_types.h"
 
-// IN: 方向、PWM: 速度入力を想定。実配線に合わせて確認・変更すること。
-constexpr int MOTOR_IN[config::wheel_count] = {15, 17, 6};
-constexpr int MOTOR_PWM[config::wheel_count] = {16, 18, 7};
+// 各モーターをIN1/IN2の2入力で正逆転させるHブリッジ方式。
+// 車輪順: 0=右下(M1), 1=左下(M2), 2=正面(M3)
+constexpr int MOTOR_IN1[config::wheel_count] = {15, 6, 18};
+constexpr int MOTOR_IN2[config::wheel_count] = {16, 7, 17};
+constexpr int STBY_PIN = 8;
 constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
 constexpr uint32_t MOTOR_PWM_FREQ_HZ = 20000;
 constexpr uint8_t MOTOR_PWM_BITS = 8;
 constexpr int MOTOR_PWM_MAX = (1 << MOTOR_PWM_BITS) - 1;
+constexpr int MOTOR_PWM = 60;  // PIDが出せる最大duty。0～255
+
+// Arduino-ESP32 2.xではPWMチャンネル番号が必要。
+constexpr uint8_t MOTOR_IN1_CHANNEL[config::wheel_count] = {0, 2, 4};
+constexpr uint8_t MOTOR_IN2_CHANNEL[config::wheel_count] = {1, 3, 5};
 
 // 逆運動学: 機体速度 -> 各車輪の接線速度
 WheelSpeeds inverse(const BodyTwist &t) {
@@ -47,41 +54,75 @@ bool omni_Forward(const WheelSpeeds &wheel, BodyTwist &body) {
   return true;
 }
 
+void omni_WritePwm(uint8_t wheel, bool input1, uint32_t duty) {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  ledcWrite(input1 ? MOTOR_IN1[wheel] : MOTOR_IN2[wheel], duty);
+#else
+  ledcWrite(input1 ? MOTOR_IN1_CHANNEL[wheel] : MOTOR_IN2_CHANNEL[wheel], duty);
+#endif
+}
+
 void omni_WriteMotor(uint8_t wheel, float signedPwm) {
   if (wheel >= config::wheel_count) return;
   signedPwm *= MOTOR_DIRECTION_SIGN[wheel];
-  signedPwm = constrain(signedPwm, -static_cast<float>(MOTOR_PWM_MAX), static_cast<float>(MOTOR_PWM_MAX));
-  digitalWrite(MOTOR_IN[wheel], signedPwm >= 0.0f ? HIGH : LOW);
+  signedPwm = constrain(signedPwm, -static_cast<float>(MOTOR_PWM), static_cast<float>(MOTOR_PWM));
   const uint32_t duty = static_cast<uint32_t>(fabsf(signedPwm));
-#if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcWrite(MOTOR_PWM[wheel], duty);
-#else
-  ledcWrite(wheel, duty);
-#endif
+
+  if (signedPwm > 0.0f) {
+    omni_WritePwm(wheel, true, duty);
+    omni_WritePwm(wheel, false, 0);
+  } else if (signedPwm < 0.0f) {
+    omni_WritePwm(wheel, true, 0);
+    omni_WritePwm(wheel, false, duty);
+  } else {
+    omni_WritePwm(wheel, true, 0);
+    omni_WritePwm(wheel, false, 0);
+  }
 }
 
 void omni_Stop() { for (uint8_t i = 0; i < config::wheel_count; ++i) omni_WriteMotor(i, 0.0f); }
 
 void omni_Init() {
+  pinMode(STBY_PIN, OUTPUT);
+  digitalWrite(STBY_PIN, LOW);  // PWM設定中はドライバを停止
+
   for (uint8_t i = 0; i < config::wheel_count; ++i) {
-    pinMode(MOTOR_IN[i], OUTPUT);
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-    ledcAttach(MOTOR_PWM[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcAttach(MOTOR_IN1[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcAttach(MOTOR_IN2[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
 #else
-    ledcSetup(i, MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS); ledcAttachPin(MOTOR_PWM[i], i);
+    ledcSetup(MOTOR_IN1_CHANNEL[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcSetup(MOTOR_IN2_CHANNEL[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcAttachPin(MOTOR_IN1[i], MOTOR_IN1_CHANNEL[i]);
+    ledcAttachPin(MOTOR_IN2[i], MOTOR_IN2_CHANNEL[i]);
 #endif
   }
   omni_Stop();
+  digitalWrite(STBY_PIN, HIGH);
 }
 
-// PID出力はPWM duty[-255,255]。実機で必ず調整すること。
-struct WheelPID { float kp = 160.0f, ki = 20.0f, kd = 0.0f, integral = 0.0f, previousError = 0.0f; };
+// 保守的な初期PID設定。D項はエンコーダー速度のノイズを増幅しやすいため0から始める。
+// 最終的には実機を浮かせた試験から順に調整すること。
+constexpr float PID_INTEGRAL_LIMIT = 2.0f;
+constexpr float PID_PWM_SLEW_PER_SECOND = 120.0f;
+struct WheelPID {
+  float kp = 100.0f;
+  float ki = 15.0f;
+  float kd = 0.0f;
+  float integral = 0.0f;
+  float previousError = 0.0f;
+  float previousOutput = 0.0f;
+};
 WheelPID wheelPid[config::wheel_count];
 WheelSpeeds targetWheelSpeed;
 BodyTwist targetBodyVelocity = {0.0f, 0.0f, 0.0f};
 
 void omni_ResetPid() {
-  for (uint8_t i = 0; i < config::wheel_count; ++i) wheelPid[i].integral = wheelPid[i].previousError = 0.0f;
+  for (uint8_t i = 0; i < config::wheel_count; ++i) {
+    wheelPid[i].integral = 0.0f;
+    wheelPid[i].previousError = 0.0f;
+    wheelPid[i].previousOutput = 0.0f;
+  }
 }
 
 void omni_SetBodyVelocity(float vx_mps, float vy_mps, float w_radps) {
@@ -103,12 +144,33 @@ void omni_UpdatePid(float dt_s) {
   if (dt_s <= 0.0f) return;
   for (uint8_t i = 0; i < config::wheel_count; ++i) {
     const float target = targetWheelSpeed.v_wheel[i];
-    if (fabsf(target) < 0.001f) { wheelPid[i].integral = wheelPid[i].previousError = 0.0f; omni_WriteMotor(i, 0.0f); continue; }
+    if (fabsf(target) < 0.001f) {
+      wheelPid[i].integral = 0.0f;
+      wheelPid[i].previousError = 0.0f;
+      wheelPid[i].previousOutput = 0.0f;
+      omni_WriteMotor(i, 0.0f);
+      continue;
+    }
     const float error = target - wheelSpeedMps[i];
-    wheelPid[i].integral = constrain(wheelPid[i].integral + error * dt_s, -2.0f, 2.0f);
+    wheelPid[i].integral = constrain(
+      wheelPid[i].integral + error * dt_s,
+      -PID_INTEGRAL_LIMIT,
+      PID_INTEGRAL_LIMIT
+    );
     const float derivative = (error - wheelPid[i].previousError) / dt_s;
     float output = wheelPid[i].kp * error + wheelPid[i].ki * wheelPid[i].integral + wheelPid[i].kd * derivative;
-    output = constrain(output, -static_cast<float>(MOTOR_PWM_MAX), static_cast<float>(MOTOR_PWM_MAX));
-    wheelPid[i].previousError = error; omni_WriteMotor(i, output);
+    output = constrain(output, -static_cast<float>(MOTOR_PWM), static_cast<float>(MOTOR_PWM));
+
+    // 指令PWMを徐々に変化させ、急発進と機体の姿勢崩れを抑える。
+    const float maxOutputChange = PID_PWM_SLEW_PER_SECOND * dt_s;
+    output = constrain(
+      output,
+      wheelPid[i].previousOutput - maxOutputChange,
+      wheelPid[i].previousOutput + maxOutputChange
+    );
+
+    wheelPid[i].previousError = error;
+    wheelPid[i].previousOutput = output;
+    omni_WriteMotor(i, output);
   }
 }

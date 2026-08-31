@@ -11,7 +11,13 @@ namespace config {
 constexpr uint8_t wheel_count = 3;
 constexpr float wheel_radius_m = 0.050f;       // 実測値に変更
 constexpr float mount_radius_m = 0.150f;       // 機体中心から車輪まで
-constexpr float mount_offset[wheel_count] = {kPi / 3.0f, 2.0f * kPi / 3.0f, kPi};
+// 機体前方を0rad、左方向を+π/2、反時計回りを正とする。
+// 車輪順: 0=M1右後、1=M2左後、2=M3正面
+constexpr float mount_offset[wheel_count] = {
+  -2.0f * kPi / 3.0f,  // M1 右後: -120°
+   2.0f * kPi / 3.0f,  // M2 左後: +120°
+   0.0f                 // M3 正面:    0°
+};
 constexpr float max_wheel_speed_mps = 1.0f;
 }
 
