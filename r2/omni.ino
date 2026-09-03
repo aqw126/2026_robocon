@@ -1,9 +1,9 @@
 #include "robot_types.h"
 
 // 各モーターをIN1/IN2の2入力で正逆転させるHブリッジ方式。
-// 車輪順: 0=右下(M1), 1=左下(M2), 2=正面(M3)
-constexpr int MOTOR_IN1[config::wheel_count] = {15, 6, 18};
-constexpr int MOTOR_IN2[config::wheel_count] = {16, 7, 17};
+// 車輪順: 0=左前、1=後ろ、2=右前
+constexpr int MOTOR_IN1[config::wheel_count] = {6, 15, 17};
+constexpr int MOTOR_IN2[config::wheel_count] = {7, 16, 18};
 constexpr int STBY_PIN = 8;
 constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
 constexpr uint32_t MOTOR_PWM_FREQ_HZ = 20000;

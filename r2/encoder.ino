@@ -1,6 +1,7 @@
 #include "robot_types.h"
 
-// エンコーダー1は実配線。エンコーダー2・3はピン情報待ちの仮値。
+// 車輪順: 0=左前、1=後ろ、2=右前。
+// 左前エンコーダーは実配線。後ろ・右前はピン情報待ちの仮値。
 // ENCODER_COUNTS_PER_WHEEL_REV はA相立上りで得られる車輪1回転当たりの実カウント数。
 constexpr int ENC_A[config::wheel_count] = {2, 9, 11};
 constexpr int ENC_B[config::wheel_count] = {1, 10, 12};

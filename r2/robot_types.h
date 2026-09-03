@@ -4,7 +4,7 @@
 #include <math.h>
 
 // 座標系: x=前方, y=左方, 角速度w=反時計回り。単位: m, s, rad
-// 車輪順: 0=右下(π/3), 1=左下(2π/3), 2=正面(π)
+// 車輪順: 0=左前、1=後ろ、2=右前
 constexpr float kPi = 3.14159265358979323846f;
 
 namespace config {
@@ -12,11 +12,11 @@ constexpr uint8_t wheel_count = 3;
 constexpr float wheel_radius_m = 0.050f;       // 実測値に変更
 constexpr float mount_radius_m = 0.150f;       // 機体中心から車輪まで
 // 機体前方を0rad、左方向を+π/2、反時計回りを正とする。
-// 車輪順: 0=M1右後、1=M2左後、2=M3正面
+// 車輪順: 0=左前、1=後ろ、2=右前
 constexpr float mount_offset[wheel_count] = {
-  -2.0f * kPi / 3.0f,  // M1 右後: -120°
-   2.0f * kPi / 3.0f,  // M2 左後: +120°
-   0.0f                 // M3 正面:    0°
+   kPi / 3.0f,   // 左前: +60°
+   kPi,          // 後ろ: 180°（車輪の転がり方向は真横）
+  -kPi / 3.0f    // 右前: -60°
 };
 constexpr float max_wheel_speed_mps = 1.0f;
 }
