@@ -1,7 +1,7 @@
 // 三輪オムニホイール モーター自動確認用
-// 電源投入後、3秒待ってから各モーターを1台ずつ動かします。
+// 電源投入後、3秒待ってから各モーターを1台ずつ両方向に動かします。
 // シリアルモニターからのコマンド入力は不要です。
-// sketch_aug28a.ino と同じく、SDをLOWにしてINへPWMを出力します。
+// 各車輪について「IN側駆動 -> 停止 -> SD側駆動 -> 停止」を実行します。
 
 // M1: 後ろ（車輪は真横向き）
 constexpr int M1_IN = 15;
@@ -22,20 +22,39 @@ constexpr unsigned long STOP_MS = 800;
 
 void stopAllMotors() {
   analogWrite(M1_IN, 0);
+  analogWrite(M1_SD, 0);
   analogWrite(M2_IN, 0);
+  analogWrite(M2_SD, 0);
   analogWrite(M3_IN, 0);
+  analogWrite(M3_SD, 0);
 }
 
 void testMotor(int inPin, int sdPin, const char* name) {
   Serial.print(name);
-  Serial.println(" 駆動開始");
+  Serial.println(" IN側駆動");
 
-  // 添付された動作コードと同じ制御方法。
-  digitalWrite(sdPin, LOW);
+  // IN側だけにPWMを出す。
+  analogWrite(sdPin, 0);
   analogWrite(inPin, MOTOR_PWM);
   delay(RUN_MS);
 
+  // 方向を切り替える前に、必ず両入力を0にする。
   analogWrite(inPin, 0);
+  analogWrite(sdPin, 0);
+  Serial.print(name);
+  Serial.println(" 停止");
+  delay(STOP_MS);
+
+  Serial.print(name);
+  Serial.println(" SD側駆動");
+
+  // SD側だけにPWMを出す。
+  analogWrite(inPin, 0);
+  analogWrite(sdPin, MOTOR_PWM);
+  delay(RUN_MS);
+
+  analogWrite(inPin, 0);
+  analogWrite(sdPin, 0);
   Serial.print(name);
   Serial.println(" 停止");
   delay(STOP_MS);
@@ -50,11 +69,6 @@ void setup() {
   pinMode(M2_SD, OUTPUT);
   pinMode(M3_IN, OUTPUT);
   pinMode(M3_SD, OUTPUT);
-
-  // 参考コードでは、全モーターのSDをLOWに固定している。
-  digitalWrite(M1_SD, LOW);
-  digitalWrite(M2_SD, LOW);
-  digitalWrite(M3_SD, LOW);
 
   stopAllMotors();
 

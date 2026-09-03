@@ -11,6 +11,7 @@ Adafruit_BNO055 bno(55, 0x28);
 float imuHeadingRad = 0.0f;
 bool bnoAvailable = false;
 static float gyroReferenceRad = 0.0f;
+static float gyroHeadingAtReferenceRad = 0.0f;
 
 float gyro_NormalizeAngle(float angle) { while (angle > kPi) angle -= 2.0f * kPi; while (angle <= -kPi) angle += 2.0f * kPi; return angle; }
 void gyro_Init() {
@@ -19,14 +20,21 @@ void gyro_Init() {
   bno.setExtCrystalUse(true); delay(50);
   const imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
   gyroReferenceRad = BNO_YAW_SIGN * radians(euler.x()) + BNO_YAW_OFFSET_RAD;
+  gyroHeadingAtReferenceRad = 0.0f;
+  imuHeadingRad = 0.0f;
 }
 void gyro_Update() {
   if (!bnoAvailable) return;
   const imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-  imuHeadingRad = gyro_NormalizeAngle(BNO_YAW_SIGN * radians(euler.x()) + BNO_YAW_OFFSET_RAD - gyroReferenceRad);
+  imuHeadingRad = gyro_NormalizeAngle(
+    BNO_YAW_SIGN * radians(euler.x()) + BNO_YAW_OFFSET_RAD
+    - gyroReferenceRad + gyroHeadingAtReferenceRad
+  );
 }
-void gyro_ResetHeading() {
+void gyro_ResetHeading(float heading_rad) {
+  gyroHeadingAtReferenceRad = gyro_NormalizeAngle(heading_rad);
+  imuHeadingRad = gyroHeadingAtReferenceRad;
   if (!bnoAvailable) return;
   const imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-  gyroReferenceRad = BNO_YAW_SIGN * radians(euler.x()) + BNO_YAW_OFFSET_RAD; imuHeadingRad = 0.0f;
+  gyroReferenceRad = BNO_YAW_SIGN * radians(euler.x()) + BNO_YAW_OFFSET_RAD;
 }

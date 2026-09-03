@@ -44,7 +44,7 @@ void encoder_Init();
 bool encoder_Update();
 void gyro_Init();
 void gyro_Update();
-void gyro_ResetHeading();
+void gyro_ResetHeading(float heading_rad);
 void odometry_Init();
 void odometry_Update();
 void odometry_Reset(float x_m, float y_m);

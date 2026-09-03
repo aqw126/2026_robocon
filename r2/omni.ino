@@ -1,19 +1,19 @@
 #include "robot_types.h"
 
-// 各モーターをIN1/IN2の2入力で正逆転させるHブリッジ方式。
+// 各モーターをIN/SDの2入力で正逆転させるHブリッジ方式。
 // 車輪順: 0=左前、1=後ろ、2=右前
-constexpr int MOTOR_IN1[config::wheel_count] = {6, 15, 17};
-constexpr int MOTOR_IN2[config::wheel_count] = {7, 16, 18};
-constexpr int STBY_PIN = 8;
+constexpr int MOTOR_IN[config::wheel_count] = {6, 15, 18};
+constexpr int MOTOR_SD[config::wheel_count] = {7, 16, 17};
+// 実機確認結果: 3輪ともIN側駆動が正方向。
 constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
 constexpr uint32_t MOTOR_PWM_FREQ_HZ = 20000;
 constexpr uint8_t MOTOR_PWM_BITS = 8;
 constexpr int MOTOR_PWM_MAX = (1 << MOTOR_PWM_BITS) - 1;
-constexpr int MOTOR_PWM = 60;  // PIDが出せる最大duty。0～255
+constexpr int MOTOR_PWM = 25;  // 実機確認時の安全な初期上限。0～255
 
 // Arduino-ESP32 2.xではPWMチャンネル番号が必要。
-constexpr uint8_t MOTOR_IN1_CHANNEL[config::wheel_count] = {0, 2, 4};
-constexpr uint8_t MOTOR_IN2_CHANNEL[config::wheel_count] = {1, 3, 5};
+constexpr uint8_t MOTOR_IN_CHANNEL[config::wheel_count] = {0, 2, 4};
+constexpr uint8_t MOTOR_SD_CHANNEL[config::wheel_count] = {1, 3, 5};
 
 // 逆運動学: 機体速度 -> 各車輪の接線速度
 WheelSpeeds inverse(const BodyTwist &t) {
@@ -54,11 +54,11 @@ bool omni_Forward(const WheelSpeeds &wheel, BodyTwist &body) {
   return true;
 }
 
-void omni_WritePwm(uint8_t wheel, bool input1, uint32_t duty) {
+void omni_WritePwm(uint8_t wheel, bool inSide, uint32_t duty) {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcWrite(input1 ? MOTOR_IN1[wheel] : MOTOR_IN2[wheel], duty);
+  ledcWrite(inSide ? MOTOR_IN[wheel] : MOTOR_SD[wheel], duty);
 #else
-  ledcWrite(input1 ? MOTOR_IN1_CHANNEL[wheel] : MOTOR_IN2_CHANNEL[wheel], duty);
+  ledcWrite(inSide ? MOTOR_IN_CHANNEL[wheel] : MOTOR_SD_CHANNEL[wheel], duty);
 #endif
 }
 
@@ -83,22 +83,18 @@ void omni_WriteMotor(uint8_t wheel, float signedPwm) {
 void omni_Stop() { for (uint8_t i = 0; i < config::wheel_count; ++i) omni_WriteMotor(i, 0.0f); }
 
 void omni_Init() {
-  pinMode(STBY_PIN, OUTPUT);
-  digitalWrite(STBY_PIN, LOW);  // PWM設定中はドライバを停止
-
   for (uint8_t i = 0; i < config::wheel_count; ++i) {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-    ledcAttach(MOTOR_IN1[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
-    ledcAttach(MOTOR_IN2[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcAttach(MOTOR_IN[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcAttach(MOTOR_SD[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
 #else
-    ledcSetup(MOTOR_IN1_CHANNEL[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
-    ledcSetup(MOTOR_IN2_CHANNEL[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
-    ledcAttachPin(MOTOR_IN1[i], MOTOR_IN1_CHANNEL[i]);
-    ledcAttachPin(MOTOR_IN2[i], MOTOR_IN2_CHANNEL[i]);
+    ledcSetup(MOTOR_IN_CHANNEL[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcSetup(MOTOR_SD_CHANNEL[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcAttachPin(MOTOR_IN[i], MOTOR_IN_CHANNEL[i]);
+    ledcAttachPin(MOTOR_SD[i], MOTOR_SD_CHANNEL[i]);
 #endif
   }
   omni_Stop();
-  digitalWrite(STBY_PIN, HIGH);
 }
 
 // 保守的な初期PID設定。D項はエンコーダー速度のノイズを増幅しやすいため0から始める。

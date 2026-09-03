@@ -1,36 +1,47 @@
 #include "mission_support.h"
 
 // ============================================================
-// じょうろ取得・散水機構のAPI
-// 実機のアクチュエータが未確定のため、初期値は出力無効。
-// ピンとON/OFF極性を決めれば、上位のmission.inoは変更不要。
+// アーム機構のAPI
+// sketch_sep03cR.inoのloop() 1回分に相当する100msだけモーターを回し、
+// その後はPWMと方向入力をすべてLOWにして停止する。
 // ============================================================
-constexpr int MECHANISM_OUTPUT_PIN = -1;  // 例: 27。未接続時は -1
-constexpr bool MECHANISM_ACTIVE_HIGH = true;
-constexpr uint32_t GET_CAN_DURATION_MS = 800;
+constexpr int ARM_IN1_PIN = 4;
+constexpr int ARM_IN2_PIN = 5;
+// 添付コードのGPIO6は左前走行モーターと重なるため、未使用のGPIO8へ変更。
+constexpr int ARM_PWM_PIN = 8;
+constexpr int ARM_PWM_DUTY = 200;
+constexpr uint32_t GET_CAN_DURATION_MS = 100;
 constexpr uint32_t WATER_DURATION_MS = 1500;
 
 enum MechanismAction { MECHANISM_IDLE, MECHANISM_GET_CAN, MECHANISM_WATER };
 MechanismAction mechanismAction = MECHANISM_IDLE;
 uint32_t mechanismActionStartMs = 0;
 
-void mechanism_Write(bool active) {
-  if (MECHANISM_OUTPUT_PIN < 0) return;
-  const bool level = MECHANISM_ACTIVE_HIGH ? active : !active;
-  digitalWrite(MECHANISM_OUTPUT_PIN, level ? HIGH : LOW);
+void mechanism_WriteArm(bool active) {
+  if (active) {
+    // 添付コードと同じ回転方向。
+    digitalWrite(ARM_IN1_PIN, LOW);
+    digitalWrite(ARM_IN2_PIN, HIGH);
+    analogWrite(ARM_PWM_PIN, ARM_PWM_DUTY);
+  } else {
+    analogWrite(ARM_PWM_PIN, 0);
+    digitalWrite(ARM_IN1_PIN, LOW);
+    digitalWrite(ARM_IN2_PIN, LOW);
+  }
 }
 
 void mechanism_Init() {
-  if (MECHANISM_OUTPUT_PIN >= 0) {
-    pinMode(MECHANISM_OUTPUT_PIN, OUTPUT);
-    mechanism_Write(false);
-  }
+  pinMode(ARM_IN1_PIN, OUTPUT);
+  pinMode(ARM_IN2_PIN, OUTPUT);
+  pinMode(ARM_PWM_PIN, OUTPUT);
+  mechanism_WriteArm(false);
 }
 
 void mechanism_Start(MechanismAction action) {
   mechanismAction = action;
   mechanismActionStartMs = millis();
-  mechanism_Write(true);
+  // 現在モーターを使うのは、初期動作中のアーム動作だけ。
+  mechanism_WriteArm(action == MECHANISM_GET_CAN);
 }
 
 void mechanism_StartGetCan() { mechanism_Start(MECHANISM_GET_CAN); }
@@ -45,6 +56,6 @@ bool mechanism_IsActionFinished() {
 }
 
 void mechanism_Stop() {
-  mechanism_Write(false);
+  mechanism_WriteArm(false);
   mechanismAction = MECHANISM_IDLE;
 }

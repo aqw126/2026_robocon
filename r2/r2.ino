@@ -38,7 +38,6 @@ void setup() {
 
 void loop() {
   gyro_Update();
-  tof_Update();
 
   // 100Hzでオドメトリ、状態遷移、車輪PIDを順に更新する。
   if (encoder_Update()) {
