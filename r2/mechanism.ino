@@ -2,13 +2,12 @@
 
 // ============================================================
 // アーム機構のAPI
-// sketch_sep03cR.inoのloop() 1回分に相当する100msだけモーターを回し、
-// その後はPWMと方向入力をすべてLOWにして停止する。
+// sketch_sep03cR (1).inoのloop() 1回分に相当する100msだけモーターを回し、
+// その後はPWMを0にして停止する。
 // ============================================================
-constexpr int ARM_IN1_PIN = 4;
-constexpr int ARM_IN2_PIN = 5;
-// 添付コードのGPIO6は左前走行モーターと重なるため、未使用のGPIO8へ変更。
-constexpr int ARM_PWM_PIN = 8;
+constexpr int ARM_IN_PIN = 5;
+constexpr int ARM_PWM_PIN = 4;
+constexpr int ARM_SENSOR_PIN = 14;
 constexpr int ARM_PWM_DUTY = 200;
 constexpr uint32_t GET_CAN_DURATION_MS = 100;
 constexpr uint32_t WATER_DURATION_MS = 1500;
@@ -20,20 +19,18 @@ uint32_t mechanismActionStartMs = 0;
 void mechanism_WriteArm(bool active) {
   if (active) {
     // 添付コードと同じ回転方向。
-    digitalWrite(ARM_IN1_PIN, LOW);
-    digitalWrite(ARM_IN2_PIN, HIGH);
+    digitalWrite(ARM_IN_PIN, LOW);
     analogWrite(ARM_PWM_PIN, ARM_PWM_DUTY);
   } else {
     analogWrite(ARM_PWM_PIN, 0);
-    digitalWrite(ARM_IN1_PIN, LOW);
-    digitalWrite(ARM_IN2_PIN, LOW);
+    digitalWrite(ARM_IN_PIN, LOW);
   }
 }
 
 void mechanism_Init() {
-  pinMode(ARM_IN1_PIN, OUTPUT);
-  pinMode(ARM_IN2_PIN, OUTPUT);
+  pinMode(ARM_IN_PIN, OUTPUT);
   pinMode(ARM_PWM_PIN, OUTPUT);
+  pinMode(ARM_SENSOR_PIN, INPUT_PULLUP);
   mechanism_WriteArm(false);
 }
 

@@ -22,19 +22,16 @@ enum MissionState {
   INITIAL_TURN_FROM_A,
   INITIAL_GO_GARDEN_2,
   INITIAL_BACK_TO_PROMENADE_2,
-  GO_GARDEN_TO_A,
-  GO_WAREHOUSE_A,
-  GO_GARDEN_TO_C,
-  GO_WAREHOUSE_C,
+  LOOP_SHIFT_TO_C_X,
+  LOOP_GO_WAREHOUSE_C,
+  LOOP_GO_GARDEN_FROM_C,
+  LOOP_BACK_TO_PROMENADE_FOR_A,
+  LOOP_SHIFT_TO_A_X,
+  LOOP_GO_WAREHOUSE_A,
+  LOOP_GO_GARDEN_FROM_A,
+  LOOP_BACK_TO_PROMENADE_FOR_C,
   DONE,
   ERROR_STOP,
-};
-
-// 各ゾーンへは、X中心合わせ -> 進入方向へ旋回 -> Y方向へ直進、の順で入る。
-enum ZoneApproachPhase {
-  ALIGN_ZONE_X,
-  FACE_ZONE_ENTRY,
-  ENTER_ZONE_ALONG_Y,
 };
 
 // 添付図の2400mm x 4500mmフィールドから読み取った座標。
@@ -84,10 +81,8 @@ constexpr float MISSION_HEADING_KP = 1.5f;
 constexpr float MISSION_MAX_TURN_RATE_RADPS = 0.80f;
 
 MissionState missionState = INITIAL_GO_WAREHOUSE_C;
-ZoneApproachPhase zoneApproachPhase = ALIGN_ZONE_X;
 uint32_t missionStateEnteredMs = 0;
 uint32_t targetArrivalSinceMs = 0;
-float zoneEntryHeadingRad = 0.0f;
 
 const char *mission_StateName(MissionState state) {
   switch (state) {
@@ -102,10 +97,14 @@ const char *mission_StateName(MissionState state) {
     case INITIAL_TURN_FROM_A: return "INITIAL_TURN_FROM_A";
     case INITIAL_GO_GARDEN_2: return "INITIAL_GO_GARDEN_2";
     case INITIAL_BACK_TO_PROMENADE_2: return "INITIAL_BACK_TO_PROMENADE_2";
-    case GO_GARDEN_TO_A: return "GO_GARDEN_TO_A";
-    case GO_WAREHOUSE_A: return "GO_WAREHOUSE_A";
-    case GO_GARDEN_TO_C: return "GO_GARDEN_TO_C";
-    case GO_WAREHOUSE_C: return "GO_WAREHOUSE_C";
+    case LOOP_SHIFT_TO_C_X: return "LOOP_SHIFT_TO_C_X";
+    case LOOP_GO_WAREHOUSE_C: return "LOOP_GO_WAREHOUSE_C";
+    case LOOP_GO_GARDEN_FROM_C: return "LOOP_GO_GARDEN_FROM_C";
+    case LOOP_BACK_TO_PROMENADE_FOR_A: return "LOOP_BACK_TO_PROMENADE_FOR_A";
+    case LOOP_SHIFT_TO_A_X: return "LOOP_SHIFT_TO_A_X";
+    case LOOP_GO_WAREHOUSE_A: return "LOOP_GO_WAREHOUSE_A";
+    case LOOP_GO_GARDEN_FROM_A: return "LOOP_GO_GARDEN_FROM_A";
+    case LOOP_BACK_TO_PROMENADE_FOR_C: return "LOOP_BACK_TO_PROMENADE_FOR_C";
     case DONE: return "DONE";
     case ERROR_STOP: return "ERROR_STOP";
   }
@@ -114,7 +113,6 @@ const char *mission_StateName(MissionState state) {
 
 void mission_SetState(MissionState nextState) {
   missionState = nextState;
-  zoneApproachPhase = ALIGN_ZONE_X;
   missionStateEnteredMs = millis();
   targetArrivalSinceMs = 0;
   Serial.print("Mission state: ");
@@ -135,11 +133,6 @@ float mission_NormalizeAngle(float angle) {
   while (angle > kPi) angle -= 2.0f * kPi;
   while (angle <= -kPi) angle += 2.0f * kPi;
   return angle;
-}
-
-void mission_SetZoneApproachPhase(ZoneApproachPhase nextPhase) {
-  zoneApproachPhase = nextPhase;
-  targetArrivalSinceMs = 0;
 }
 
 bool mission_HoldForDwell() {
@@ -202,76 +195,6 @@ bool mission_ShiftAlongX(float targetX_m, float targetHeadingRad) {
     MISSION_X_MAX_SPEED_MPS
   );
   mission_CommandFieldVelocity(vxField, 0.0f, targetHeadingRad);
-  return false;
-}
-
-bool mission_ApproachZone(float targetX_m, float targetY_m) {
-  switch (zoneApproachPhase) {
-    case ALIGN_ZONE_X: {
-      const float dx = targetX_m - robotPose.x_m;
-      if (fabsf(dx) <= MISSION_X_TOLERANCE_M) {
-        omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
-        if (mission_HoldForDwell()) {
-          // 現在位置から目標Yへ向かう方向を、ゾーン進入時の正面とする。
-          zoneEntryHeadingRad = targetY_m >= robotPose.y_m ? kPi / 2.0f : -kPi / 2.0f;
-          mission_SetZoneApproachPhase(FACE_ZONE_ENTRY);
-        }
-        return false;
-      }
-
-      targetArrivalSinceMs = 0;
-      const float vxField = constrain(
-        MISSION_POSITION_KP * dx,
-        -MISSION_X_MAX_SPEED_MPS,
-        MISSION_X_MAX_SPEED_MPS
-      );
-      // この段階ではYを変えず、ゾーン中心のX座標だけに合わせる。
-      mission_CommandFieldVelocity(vxField, 0.0f, MISSION_X_ALIGNMENT_HEADING_RAD);
-      return false;
-    }
-
-    case FACE_ZONE_ENTRY: {
-      const float headingError = mission_NormalizeAngle(zoneEntryHeadingRad - robotPose.heading_rad);
-      if (fabsf(headingError) <= MISSION_HEADING_TOLERANCE_RAD) {
-        omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
-        if (mission_HoldForDwell()) mission_SetZoneApproachPhase(ENTER_ZONE_ALONG_Y);
-        return false;
-      }
-
-      targetArrivalSinceMs = 0;
-      mission_CommandFieldVelocity(0.0f, 0.0f, zoneEntryHeadingRad);
-      return false;
-    }
-
-    case ENTER_ZONE_ALONG_Y: {
-      const float dy = targetY_m - robotPose.y_m;
-      if (fabsf(dy) <= MISSION_Y_TOLERANCE_M) {
-        // X方向には補正移動せず、Y軸と平行な進入を最後まで維持する。
-        mission_CommandFieldVelocity(0.0f, 0.0f, zoneEntryHeadingRad);
-        return mission_HoldForDwell();
-      }
-
-      targetArrivalSinceMs = 0;
-      const float vyField = constrain(
-        MISSION_POSITION_KP * dy,
-        -MISSION_ENTRY_MAX_SPEED_MPS,
-        MISSION_ENTRY_MAX_SPEED_MPS
-      );
-      mission_CommandFieldVelocity(0.0f, vyField, zoneEntryHeadingRad);
-      return false;
-    }
-  }
-
-  // 到達不能な状態値を検出した場合は安全停止する。
-  omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
-  return false;
-}
-
-bool mission_DriveTo(float targetX_m, float targetY_m) {
-  if (mission_ApproachZone(targetX_m, targetY_m)) {
-    omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
-    return true;
-  }
   return false;
 }
 
@@ -377,31 +300,77 @@ void mission_Update() {
             PROMENADE_CENTER_Y_M,
             HEADING_POSITIVE_Y_RAD,
             MISSION_Y_TOLERANCE_M)) {
-        mission_SetState(GO_WAREHOUSE_C);
+        mission_SetState(LOOP_SHIFT_TO_C_X);
       } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
       break;
 
-    case GO_GARDEN_TO_A:
-      if (mission_DriveTo(GARDEN_X_M, GARDEN_Y_M)) mission_SetState(GO_WAREHOUSE_A);
-      else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
+    // ここから往復動作。倉庫内では横移動せず、必ず遊歩道中央でXを合わせる。
+    case LOOP_SHIFT_TO_C_X:
+      if (mission_ShiftAlongX(WAREHOUSE_C_X_M, HEADING_POSITIVE_Y_RAD)) {
+        mission_SetState(LOOP_GO_WAREHOUSE_C);
+      } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
       break;
 
-    case GO_WAREHOUSE_A:
-      if (mission_DriveTo(WAREHOUSE_A_X_M, WAREHOUSE_A_Y_M)) mission_SetState(GO_GARDEN_TO_C);
-      else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
+    // 往復中は+Yを向いたまま、倉庫Cへ後退して進入する。
+    case LOOP_GO_WAREHOUSE_C:
+      if (mission_DriveAlongY(
+            INITIAL_WAREHOUSE_C_DEEP_Y_M,
+            HEADING_POSITIVE_Y_RAD,
+            WALL_TOUCH_TARGET_TOLERANCE_M)) {
+        mission_SetState(LOOP_GO_GARDEN_FROM_C);
+      } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
       break;
 
-    case GO_GARDEN_TO_C:
-      if (mission_DriveTo(GARDEN_X_M, GARDEN_Y_M)) mission_SetState(GO_WAREHOUSE_C);
-      else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
+    case LOOP_GO_GARDEN_FROM_C:
+      if (mission_DriveAlongY(
+            INITIAL_GARDEN_DEEP_Y_M,
+            HEADING_POSITIVE_Y_RAD,
+            WALL_TOUCH_TARGET_TOLERANCE_M)) {
+        mission_SetState(LOOP_BACK_TO_PROMENADE_FOR_A);
+      } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
       break;
 
-    case GO_WAREHOUSE_C:
-      if (mission_DriveTo(WAREHOUSE_C_X_M, WAREHOUSE_C_Y_M)) {
-        mission_SetState(LOOP_A_AND_C ? GO_GARDEN_TO_A : DONE);
-      } else if (mission_MoveTimedOut()) {
-        mission_SetState(ERROR_STOP);
-      }
+    case LOOP_BACK_TO_PROMENADE_FOR_A:
+      if (mission_DriveAlongY(
+            PROMENADE_CENTER_Y_M,
+            HEADING_POSITIVE_Y_RAD,
+            MISSION_Y_TOLERANCE_M)) {
+        mission_SetState(LOOP_SHIFT_TO_A_X);
+      } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
+      break;
+
+    case LOOP_SHIFT_TO_A_X:
+      if (mission_ShiftAlongX(WAREHOUSE_A_X_M, HEADING_POSITIVE_Y_RAD)) {
+        mission_SetState(LOOP_GO_WAREHOUSE_A);
+      } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
+      break;
+
+    // 往復中は+Yを向いたまま、倉庫Aへ後退して進入する。
+    case LOOP_GO_WAREHOUSE_A:
+      if (mission_DriveAlongY(
+            INITIAL_WAREHOUSE_A_DEEP_Y_M,
+            HEADING_POSITIVE_Y_RAD,
+            WALL_TOUCH_TARGET_TOLERANCE_M)) {
+        mission_SetState(LOOP_GO_GARDEN_FROM_A);
+      } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
+      break;
+
+    case LOOP_GO_GARDEN_FROM_A:
+      if (mission_DriveAlongY(
+            INITIAL_GARDEN_DEEP_Y_M,
+            HEADING_POSITIVE_Y_RAD,
+            WALL_TOUCH_TARGET_TOLERANCE_M)) {
+        mission_SetState(LOOP_BACK_TO_PROMENADE_FOR_C);
+      } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
+      break;
+
+    case LOOP_BACK_TO_PROMENADE_FOR_C:
+      if (mission_DriveAlongY(
+            PROMENADE_CENTER_Y_M,
+            HEADING_POSITIVE_Y_RAD,
+            MISSION_Y_TOLERANCE_M)) {
+        mission_SetState(LOOP_A_AND_C ? LOOP_SHIFT_TO_C_X : DONE);
+      } else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
       break;
 
     case DONE:
