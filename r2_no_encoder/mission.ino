@@ -84,7 +84,7 @@ MissionState missionState = INITIAL_GO_WAREHOUSE_C;
 uint32_t missionStateEnteredMs = 0;
 uint32_t targetArrivalSinceMs = 0;
 
-const char *mission_StateName(MissionState state) {
+const char *mission_StateName(uint8_t state) {
   switch (state) {
     case INITIAL_GO_WAREHOUSE_C: return "INITIAL_GO_WAREHOUSE_C";
     case INITIAL_ARM_ACTION: return "INITIAL_ARM_ACTION";
@@ -111,19 +111,19 @@ const char *mission_StateName(MissionState state) {
   return "UNKNOWN";
 }
 
-void mission_SetState(MissionState nextState) {
-  missionState = nextState;
+void mission_SetState(uint8_t nextState) {
+  missionState = static_cast<MissionState>(nextState);
   missionStateEnteredMs = millis();
   targetArrivalSinceMs = 0;
   Serial.print("Mission state: ");
-  Serial.println(mission_StateName(nextState));
+  Serial.println(mission_StateName(missionState));
 
-  if (nextState == INITIAL_ARM_ACTION) {
+  if (missionState == INITIAL_ARM_ACTION) {
     // アーム実装後もmission側の状態遷移を変えずに使える受け口。
     mechanism_StartGetCan();
   }
 
-  if (nextState == DONE || nextState == ERROR_STOP) {
+  if (missionState == DONE || missionState == ERROR_STOP) {
     omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
     mechanism_Stop();
   }
@@ -135,23 +135,37 @@ float mission_NormalizeAngle(float angle) {
   return angle;
 }
 
+float mission_HeadingError(float targetHeadingRad) {
+  float error = mission_NormalizeAngle(targetHeadingRad - robotPose.heading_rad);
+
+  // 180度付近はBNO055の微小変動で回転方向が交互に反転しやすい。
+  // R2e.inoで確認できた時計回り（負）へ固定して回転を開始する。
+  constexpr float AMBIGUOUS_180_RANGE_RAD = 10.0f * kPi / 180.0f;
+  if (fabsf(fabsf(error) - kPi) <= AMBIGUOUS_180_RANGE_RAD) {
+    error = -fabsf(error);
+  }
+  return error;
+}
+
 bool mission_HoldForDwell() {
   if (targetArrivalSinceMs == 0) targetArrivalSinceMs = millis();
   return millis() - targetArrivalSinceMs >= TARGET_DWELL_MS;
 }
 
 void mission_CommandFieldVelocity(float vxField, float vyField, float targetHeadingRad) {
-  const float headingError = mission_NormalizeAngle(targetHeadingRad - robotPose.heading_rad);
-  const float turnRate = constrain(
-    MISSION_HEADING_KP * headingError,
-    -MISSION_MAX_TURN_RATE_RADPS,
-    MISSION_MAX_TURN_RATE_RADPS
-  );
+  const float headingError = mission_HeadingError(targetHeadingRad);
+  const float turnRate = fabsf(headingError) <= MISSION_HEADING_TOLERANCE_RAD
+    ? 0.0f
+    : constrain(
+        MISSION_HEADING_KP * headingError,
+        -MISSION_MAX_TURN_RATE_RADPS,
+        MISSION_MAX_TURN_RATE_RADPS
+      );
   omni_SetFieldVelocity(vxField, vyField, turnRate, robotPose.heading_rad);
 }
 
 bool mission_TurnTo(float targetHeadingRad) {
-  const float headingError = mission_NormalizeAngle(targetHeadingRad - robotPose.heading_rad);
+  const float headingError = mission_HeadingError(targetHeadingRad);
   if (fabsf(headingError) <= MISSION_HEADING_TOLERANCE_RAD) {
     mission_CommandFieldVelocity(0.0f, 0.0f, targetHeadingRad);
     return mission_HoldForDwell();

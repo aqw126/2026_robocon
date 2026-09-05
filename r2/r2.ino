@@ -1,6 +1,7 @@
 #include "robot_types.h"
 
 constexpr uint32_t PRINT_INTERVAL_MS = 100;
+constexpr uint32_t START_WAIT_MS = 3000;
 
 void printRobotStatus() {
   static uint32_t previousPrintMs = 0;
@@ -29,6 +30,10 @@ void setup() {
   encoder_Init();
   gyro_Init();
   odometry_Init();
+
+  // 実機で成功したR2e.inoと同じく、電源投入後3秒待ってから自動開始する。
+  Serial.println("Automatic mission starts in 3 seconds");
+  delay(START_WAIT_MS);
   mission_Init();
 
   Serial.println("3-wheel omni / 2-tracking-encoder controller ready");

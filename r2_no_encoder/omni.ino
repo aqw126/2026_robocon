@@ -6,14 +6,7 @@ constexpr int MOTOR_IN[config::wheel_count] = {6, 15, 18};
 constexpr int MOTOR_SD[config::wheel_count] = {7, 16, 17};
 // 実機確認結果: 3輪ともIN側駆動が正方向。
 constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
-constexpr uint32_t MOTOR_PWM_FREQ_HZ = 20000;
-constexpr uint8_t MOTOR_PWM_BITS = 8;
-constexpr int MOTOR_PWM_MAX = (1 << MOTOR_PWM_BITS) - 1;
 constexpr int MOTOR_PWM = 50;  // 速度引き上げ後の上限。0～255
-
-// Arduino-ESP32 2.xではPWMチャンネル番号が必要。
-constexpr uint8_t MOTOR_IN_CHANNEL[config::wheel_count] = {0, 2, 4};
-constexpr uint8_t MOTOR_SD_CHANNEL[config::wheel_count] = {1, 3, 5};
 
 // 逆運動学: 機体速度 -> 各車輪の接線速度
 WheelSpeeds inverse(const BodyTwist &t) {
@@ -55,11 +48,8 @@ bool omni_Forward(const WheelSpeeds &wheel, BodyTwist &body) {
 }
 
 void omni_WritePwm(uint8_t wheel, bool inSide, uint32_t duty) {
-#if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcWrite(inSide ? MOTOR_IN[wheel] : MOTOR_SD[wheel], duty);
-#else
-  ledcWrite(inSide ? MOTOR_IN_CHANNEL[wheel] : MOTOR_SD_CHANNEL[wheel], duty);
-#endif
+  // 実機で前進・時計回り180度を確認できたR2e.inoと同じ出力方式。
+  analogWrite(inSide ? MOTOR_IN[wheel] : MOTOR_SD[wheel], duty);
 }
 
 void omni_WriteMotor(uint8_t wheel, float signedPwm) {
@@ -84,15 +74,8 @@ void omni_Stop() { for (uint8_t i = 0; i < config::wheel_count; ++i) omni_WriteM
 
 void omni_Init() {
   for (uint8_t i = 0; i < config::wheel_count; ++i) {
-#if ESP_ARDUINO_VERSION_MAJOR >= 3
-    ledcAttach(MOTOR_IN[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
-    ledcAttach(MOTOR_SD[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
-#else
-    ledcSetup(MOTOR_IN_CHANNEL[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
-    ledcSetup(MOTOR_SD_CHANNEL[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
-    ledcAttachPin(MOTOR_IN[i], MOTOR_IN_CHANNEL[i]);
-    ledcAttachPin(MOTOR_SD[i], MOTOR_SD_CHANNEL[i]);
-#endif
+    pinMode(MOTOR_IN[i], OUTPUT);
+    pinMode(MOTOR_SD[i], OUTPUT);
   }
   omni_Stop();
 }
