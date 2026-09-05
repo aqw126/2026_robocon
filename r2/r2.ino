@@ -14,12 +14,10 @@ void printRobotStatus() {
   Serial.print(robotPose.y_m, 3);
   Serial.print(',');
   Serial.print(robotPose.heading_rad, 3);
-  Serial.print(",wheel,");
-  Serial.print(wheelSpeedMps[0], 3);
+  Serial.print(",tracking,");
+  Serial.print(trackingEncoderSpeedMps[0], 3);
   Serial.print(',');
-  Serial.print(wheelSpeedMps[1], 3);
-  Serial.print(',');
-  Serial.println(wheelSpeedMps[2], 3);
+  Serial.println(trackingEncoderSpeedMps[1], 3);
 }
 
 // ESP32-S3 / Arduino IDE: 三輪オムニ（右下=π/3, 左下=2π/3, 正面=π）
@@ -33,17 +31,17 @@ void setup() {
   odometry_Init();
   mission_Init();
 
-  Serial.println("3-wheel omni controller ready");
+  Serial.println("3-wheel omni / 2-tracking-encoder controller ready");
 }
 
 void loop() {
   gyro_Update();
 
-  // 100Hzでオドメトリ、状態遷移、車輪PIDを順に更新する。
+  // 100Hzで2測定輪オドメトリ、位置制御、駆動出力を順に更新する。
   if (encoder_Update()) {
     odometry_Update();
     mission_Update();
-    omni_UpdatePid(encoderDtS);
+    omni_UpdateOutput(encoderDtS);
     printRobotStatus();
   }
 }

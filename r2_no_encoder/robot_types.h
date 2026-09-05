@@ -9,13 +9,10 @@ constexpr float kPi = 3.14159265358979323846f;
 
 namespace config {
 constexpr uint8_t drive_wheel_count = 3;
-constexpr uint8_t tracking_encoder_count = 2;
-// 既存の駆動輪処理との互換用。測定輪の個数には使用しない。
 constexpr uint8_t wheel_count = drive_wheel_count;
 
-// 駆動輪は機体中心から177.5mm。測定輪は直径35.3mmでエンコーダー軸に直結。
+// 駆動輪は機体中心から177.5mm。
 constexpr float mount_radius_m = 0.1775f;
-constexpr float tracking_wheel_radius_m = 0.01765f;
 // 機体前方を0rad、左方向を+π/2、反時計回りを正とする。
 // 車輪順: 0=左前、1=後ろ、2=右前
 constexpr float mount_offset[wheel_count] = {
@@ -24,23 +21,6 @@ constexpr float mount_offset[wheel_count] = {
   -kPi / 3.0f    // 右前: -60°
 };
 
-// 測定方向: 機体前方=0rad、左=+pi/2、反時計回りを正とする。
-// E1はユーザー座標の300度、E2は210度に対応する。
-constexpr float tracking_direction_rad[tracking_encoder_count] = {
-  -5.0f * kPi / 6.0f,  // E1: -150deg
-   2.0f * kPi / 3.0f   // E2: +120deg
-};
-
-// 測定輪の位置。x=機体前方、y=機体左方。
-// 提示された位置を時計回りに30度変換した値。
-constexpr float tracking_position_x_m[tracking_encoder_count] = {
-   0.02657f,
-  -0.12768f
-};
-constexpr float tracking_position_y_m[tracking_encoder_count] = {
-   0.10302f,
-   0.00386f
-};
 constexpr float max_wheel_speed_mps = 1.0f;
 }
 
@@ -49,12 +29,10 @@ struct WheelSpeeds { float v_wheel[config::wheel_count] = {}; };
 struct Pose2D { float x_m = 0.0f, y_m = 0.0f, heading_rad = 0.0f; };
 
 // タブ間で共有する状態
-extern float trackingEncoderSpeedMps[config::tracking_encoder_count];
-extern float trackingEncoderDeltaDistanceM[config::tracking_encoder_count];
-extern float encoderDtS;
 extern float imuHeadingRad;
 extern Pose2D robotPose;
 extern BodyTwist robotBodyVelocity;
+extern BodyTwist targetBodyVelocity;
 
 // タブ間で呼び出す関数
 void omni_Init();
@@ -63,13 +41,11 @@ void omni_SetFieldVelocity(float vx_mps, float vy_mps, float w_radps, float head
 void omni_UpdateOutput(float dt_s);
 bool omni_Forward(const WheelSpeeds &wheel, BodyTwist &body);
 
-void encoder_Init();
-bool encoder_Update();
 void gyro_Init();
 void gyro_Update();
 void gyro_ResetHeading(float heading_rad);
 void odometry_Init();
-void odometry_Update();
+void odometry_Update(float dt_s);
 void odometry_Reset(float x_m, float y_m);
 void mission_Init();
 void mission_Update();
