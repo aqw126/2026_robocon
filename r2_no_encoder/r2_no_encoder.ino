@@ -38,7 +38,7 @@ void setup() {
   delay(START_WAIT_MS);
   mission_Init();
 
-  Serial.println("WARNING: no encoder; X/Y are command-based estimates only");
+  Serial.println("WARNING: no encoder; X/Y are PWM-model estimates only");
   Serial.println("3-wheel omni / BNO055-only controller ready");
 }
 
@@ -54,7 +54,7 @@ void loop() {
     : (nowUs - previousControlUs) * 1.0e-6f;
   previousControlUs = nowUs;
 
-  // 並進位置は前周期の指令速度を積分するだけで、実移動量ではない。
+  // 並進位置は前周期に実際に出したPWMからの推定で、実測値ではない。
   odometry_Update(dtS);
   mission_Update();
   omni_UpdateOutput(dtS);

@@ -22,6 +22,8 @@ constexpr float mount_offset[wheel_count] = {
 };
 
 constexpr float max_wheel_speed_mps = 1.0f;
+// omni.inoで車輪速度指令をPWMへ変換する暫定係数。
+constexpr float drive_pwm_per_wheel_mps = 200.0f;
 }
 
 struct BodyTwist { float vx, vy, w; };
@@ -33,6 +35,7 @@ extern float imuHeadingRad;
 extern Pose2D robotPose;
 extern BodyTwist robotBodyVelocity;
 extern BodyTwist targetBodyVelocity;
+extern float appliedMotorPwm[config::wheel_count];
 
 // タブ間で呼び出す関数
 void omni_Init();

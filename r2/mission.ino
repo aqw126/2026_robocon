@@ -83,6 +83,7 @@ constexpr float MISSION_MAX_TURN_RATE_RADPS = 0.80f;
 MissionState missionState = INITIAL_GO_WAREHOUSE_C;
 uint32_t missionStateEnteredMs = 0;
 uint32_t targetArrivalSinceMs = 0;
+bool initialArmActionCompleted = false;
 
 const char *mission_StateName(uint8_t state) {
   switch (state) {
@@ -119,7 +120,8 @@ void mission_SetState(uint8_t nextState) {
   Serial.println(mission_StateName(missionState));
 
   if (missionState == INITIAL_ARM_ACTION) {
-    // アーム実装後もmission側の状態遷移を変えずに使える受け口。
+    // 180度回転より前に、駆動輪を止めてアーム動作を開始する。
+    omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
     mechanism_StartGetCan();
   }
 
@@ -218,6 +220,7 @@ bool mission_MoveTimedOut() {
 
 void mission_Init() {
   mechanism_Init();
+  initialArmActionCompleted = false;
 
   // 現在の実機姿勢を「R2中心から倉庫C中心を向く方位」としてBNO055へ対応付ける。
   gyro_ResetHeading(R2_START_HEADING_RAD);
@@ -240,11 +243,19 @@ void mission_Update() {
     // 2. アーム動作。mechanism.inoの実機出力は未設定。
     case INITIAL_ARM_ACTION:
       omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
-      if (mechanism_IsActionFinished()) mission_SetState(INITIAL_TURN_FROM_C);
+      if (mechanism_IsActionFinished()) {
+        initialArmActionCompleted = true;
+        mission_SetState(INITIAL_TURN_FROM_C);
+      }
       break;
 
     // 3. 倉庫C内で180度回転し、+Y方向を向く。
     case INITIAL_TURN_FROM_C:
+      // アーム動作が完了していない限り、180度回転を許可しない。
+      if (!initialArmActionCompleted) {
+        omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
+        break;
+      }
       if (mission_TurnTo(HEADING_POSITIVE_Y_RAD)) mission_SetState(INITIAL_GO_GARDEN_1);
       else if (mission_MoveTimedOut()) mission_SetState(ERROR_STOP);
       break;

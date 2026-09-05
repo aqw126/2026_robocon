@@ -82,9 +82,9 @@ void omni_Init() {
 
 // 2個の測定輪は各駆動輪に対応しないため、駆動輪ごとの速度PIDには使わない。
 // 位置の閉ループ制御はmission.inoで行い、ここでは車輪速度指令を暫定PWMへ変換する。
-constexpr float DRIVE_PWM_PER_MPS = 200.0f;
 constexpr float PID_PWM_SLEW_PER_SECOND = 240.0f;
 float previousMotorOutput[config::wheel_count] = {0.0f, 0.0f, 0.0f};
+float appliedMotorPwm[config::wheel_count] = {0.0f, 0.0f, 0.0f};
 WheelSpeeds targetWheelSpeed;
 BodyTwist targetBodyVelocity = {0.0f, 0.0f, 0.0f};
 
@@ -115,11 +115,12 @@ void omni_UpdateOutput(float dt_s) {
     const float target = targetWheelSpeed.v_wheel[i];
     if (fabsf(target) < 0.001f) {
       previousMotorOutput[i] = 0.0f;
+      appliedMotorPwm[i] = 0.0f;
       omni_WriteMotor(i, 0.0f);
       continue;
     }
 
-    float output = DRIVE_PWM_PER_MPS * target;
+    float output = config::drive_pwm_per_wheel_mps * target;
     output = constrain(output, -static_cast<float>(MOTOR_PWM), static_cast<float>(MOTOR_PWM));
 
     // 指令PWMを徐々に変化させ、急発進と機体の姿勢崩れを抑える。
@@ -131,6 +132,7 @@ void omni_UpdateOutput(float dt_s) {
     );
 
     previousMotorOutput[i] = output;
+    appliedMotorPwm[i] = output;
     omni_WriteMotor(i, output);
   }
 }
