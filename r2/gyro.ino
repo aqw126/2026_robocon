@@ -4,9 +4,12 @@
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
 
-constexpr int BNO_YAW_SIGN = 1;  // CCWでheadingが増えなければ-1
+// 実機確認結果: 生のHeadingは反時計回りで増加し、時計回りで減少する。
+// コード内部も反時計回りを正とするため符号はそのまま使用する。
+constexpr int BNO_YAW_SIGN = 1;
 constexpr float BNO_YAW_OFFSET_RAD = 0.0f;
-constexpr int BNO_SDA_PIN = 21, BNO_SCL_PIN = 22;
+// ta1.inoでBNO055との通信を確認できた実配線。
+constexpr int BNO_SDA_PIN = 38, BNO_SCL_PIN = 48;
 Adafruit_BNO055 bno(55, 0x28);
 float imuHeadingRad = 0.0f;
 bool bnoAvailable = false;

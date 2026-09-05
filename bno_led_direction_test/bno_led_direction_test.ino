@@ -4,9 +4,9 @@
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
 
-// r2と同じBNO055配線とI2Cアドレス。
-constexpr int BNO_SDA_PIN = 21;
-constexpr int BNO_SCL_PIN = 22;
+// ta1.inoでBNO055との通信を確認できた実配線。
+constexpr int BNO_SDA_PIN = 38;
+constexpr int BNO_SCL_PIN = 48;
 constexpr uint8_t BNO_ADDRESS = 0x28;
 
 // Ozobot DRVKitで使用しているオンボードRGB LEDの仮設定。
