@@ -9,7 +9,7 @@ constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
 constexpr uint32_t MOTOR_PWM_FREQ_HZ = 20000;
 constexpr uint8_t MOTOR_PWM_BITS = 8;
 constexpr int MOTOR_PWM_MAX = (1 << MOTOR_PWM_BITS) - 1;
-constexpr int MOTOR_PWM = 25;  // 実機確認時の安全な初期上限。0～255
+constexpr int MOTOR_PWM = 50;  // 速度引き上げ後の上限。0～255
 
 // Arduino-ESP32 2.xではPWMチャンネル番号が必要。
 constexpr uint8_t MOTOR_IN_CHANNEL[config::wheel_count] = {0, 2, 4};
@@ -99,8 +99,8 @@ void omni_Init() {
 
 // 2個の測定輪は各駆動輪に対応しないため、駆動輪ごとの速度PIDには使わない。
 // 位置の閉ループ制御はmission.inoで行い、ここでは車輪速度指令を暫定PWMへ変換する。
-constexpr float DRIVE_PWM_PER_MPS = 100.0f;
-constexpr float PID_PWM_SLEW_PER_SECOND = 120.0f;
+constexpr float DRIVE_PWM_PER_MPS = 200.0f;
+constexpr float PID_PWM_SLEW_PER_SECOND = 240.0f;
 float previousMotorOutput[config::wheel_count] = {0.0f, 0.0f, 0.0f};
 WheelSpeeds targetWheelSpeed;
 BodyTwist targetBodyVelocity = {0.0f, 0.0f, 0.0f};
