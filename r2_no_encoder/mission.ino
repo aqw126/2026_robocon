@@ -77,13 +77,13 @@ constexpr float MISSION_ENTRY_MAX_SPEED_MPS = 0.15f;
 constexpr float MISSION_X_TOLERANCE_M = 0.05f;
 constexpr float MISSION_Y_TOLERANCE_M = 0.08f;
 constexpr float WALL_TOUCH_TARGET_TOLERANCE_M = 0.02f;
-constexpr float MISSION_HEADING_TOLERANCE_RAD = 5.0f * kPi / 180.0f;
 constexpr float MISSION_X_ALIGNMENT_HEADING_RAD = 0.0f;
-// 直進中の姿勢補正と、その場旋回のゲインを分ける。
-// 現状は直進開始時の急な左旋回を切り分けるため、直進補正だけ無効。
-constexpr float MISSION_DRIVE_HEADING_KP = 0.0f;
-constexpr float MISSION_TURN_HEADING_KP = 1.5f;
-constexpr float MISSION_MAX_TURN_RATE_RADPS = 0.80f;
+// ジャイロを使わないため、180度旋回はR2e.inoで成功した出力と時間を使用する。
+constexpr float MISSION_TIMED_TURN_PWM = 25.0f;
+constexpr uint32_t MISSION_TIMED_TURN_180_MS = 5625;
+constexpr float MISSION_TIMED_TURN_RATE_RADPS =
+  -MISSION_TIMED_TURN_PWM
+  / (config::drive_pwm_per_wheel_mps * config::mount_radius_m);
 
 MissionState missionState = INITIAL_GO_WAREHOUSE_C;
 uint32_t missionStateEnteredMs = 0;
@@ -137,75 +137,28 @@ void mission_SetState(uint8_t nextState) {
   }
 }
 
-float mission_NormalizeAngle(float angle) {
-  while (angle > kPi) angle -= 2.0f * kPi;
-  while (angle <= -kPi) angle += 2.0f * kPi;
-  return angle;
-}
-
-float mission_HeadingError(float targetHeadingRad) {
-  float error = mission_NormalizeAngle(targetHeadingRad - robotPose.heading_rad);
-
-  // 180度付近はBNO055の微小変動で回転方向が交互に反転しやすい。
-  // R2e.inoで確認できた時計回り（負）へ固定して回転を開始する。
-  constexpr float AMBIGUOUS_180_RANGE_RAD = 10.0f * kPi / 180.0f;
-  if (fabsf(fabsf(error) - kPi) <= AMBIGUOUS_180_RANGE_RAD) {
-    error = -fabsf(error);
-  }
-  return error;
-}
-
 bool mission_HoldForDwell() {
   if (targetArrivalSinceMs == 0) targetArrivalSinceMs = millis();
   return millis() - targetArrivalSinceMs >= TARGET_DWELL_MS;
 }
 
-void mission_CommandFieldVelocityWithHeadingKp(
-  float vxField,
-  float vyField,
-  float targetHeadingRad,
-  float headingKp
-) {
-  const float headingError = mission_HeadingError(targetHeadingRad);
-  const float turnRate = fabsf(headingError) <= MISSION_HEADING_TOLERANCE_RAD
-    ? 0.0f
-    : constrain(
-        headingKp * headingError,
-        -MISSION_MAX_TURN_RATE_RADPS,
-        MISSION_MAX_TURN_RATE_RADPS
-      );
-  omni_SetFieldVelocity(vxField, vyField, turnRate, robotPose.heading_rad);
-}
-
 void mission_CommandFieldVelocity(float vxField, float vyField, float targetHeadingRad) {
-  mission_CommandFieldVelocityWithHeadingKp(
-    vxField,
-    vyField,
-    targetHeadingRad,
-    MISSION_DRIVE_HEADING_KP
-  );
+  // 実測角度は使用せず、その区間で想定している固定姿勢から車輪速度を計算する。
+  omni_SetFieldVelocity(vxField, vyField, 0.0f, targetHeadingRad);
 }
 
 bool mission_TurnTo(float targetHeadingRad) {
-  const float headingError = mission_HeadingError(targetHeadingRad);
-  if (fabsf(headingError) <= MISSION_HEADING_TOLERANCE_RAD) {
-    mission_CommandFieldVelocityWithHeadingKp(
-      0.0f,
-      0.0f,
-      targetHeadingRad,
-      MISSION_TURN_HEADING_KP
-    );
-    return mission_HoldForDwell();
+  if (millis() - missionStateEnteredMs < MISSION_TIMED_TURN_180_MS) {
+    targetArrivalSinceMs = 0;
+    omni_SetBodyVelocity(0.0f, 0.0f, MISSION_TIMED_TURN_RATE_RADPS);
+    return false;
   }
 
-  targetArrivalSinceMs = 0;
-  mission_CommandFieldVelocityWithHeadingKp(
-    0.0f,
-    0.0f,
-    targetHeadingRad,
-    MISSION_TURN_HEADING_KP
-  );
-  return false;
+  omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
+  // 時間旋回が180度完了したものとして、以降の座標変換に使う想定姿勢を更新する。
+  gyro_ResetHeading(targetHeadingRad);
+  robotPose.heading_rad = imuHeadingRad;
+  return mission_HoldForDwell();
 }
 
 // 姿勢を保ち、フィールドY方向だけへ直進または後退する。
@@ -252,7 +205,7 @@ void mission_Init() {
   mechanism_Init();
   initialArmActionCompleted = false;
 
-  // 現在の実機姿勢を「R2中心から倉庫C中心を向く方位」としてBNO055へ対応付ける。
+  // 開始時の実機姿勢を「R2中心から倉庫C中心を向く方位」として内部値へ設定する。
   gyro_ResetHeading(R2_START_HEADING_RAD);
   odometry_Reset(R2_START_X_M, R2_START_Y_M);
   mission_SetState(INITIAL_GO_WAREHOUSE_C);
@@ -279,7 +232,7 @@ void mission_Update() {
       }
       break;
 
-    // アーム最大出力後、電源とBNO055の通信が安定するまで短く停止する。
+    // アーム最大出力後、電源とモータードライバーが安定するまで短く停止する。
     case INITIAL_ARM_RECOVERY:
       omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
       if (millis() - missionStateEnteredMs >= ARM_POWER_RECOVERY_MS) {

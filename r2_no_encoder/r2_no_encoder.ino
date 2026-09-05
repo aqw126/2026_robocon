@@ -33,13 +33,13 @@ void setup() {
   gyro_Init();
   odometry_Init();
 
-  // BNO055の初期値が安定するための短い待機後、自動開始する。
+  // 電源投入後の短い待機を置いて自動開始する。
   Serial.println("Automatic mission starts in 0.5 seconds");
   delay(START_WAIT_MS);
   mission_Init();
 
-  Serial.println("WARNING: no encoder; X/Y are PWM-model estimates only");
-  Serial.println("3-wheel omni / BNO055-only controller ready");
+  Serial.println("WARNING: encoder and BNO055 disabled; pose is estimated only");
+  Serial.println("3-wheel omni / timed-turn controller ready");
 }
 
 void loop() {

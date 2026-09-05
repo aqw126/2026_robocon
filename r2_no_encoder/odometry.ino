@@ -1,7 +1,7 @@
 #include "robot_types.h"
 
 // エンコーダーなし版。
-// 姿勢はBNO055で測定するが、X/Yは実出力PWMから推定した速度の積分値にすぎない。
+// 姿勢は時間旋回後に更新する想定値、X/Yは実出力PWMから推定した速度の積分値にすぎない。
 // 車輪の滑り、モーター停止、壁への接触は検出できない。
 Pose2D robotPose;
 BodyTwist robotBodyVelocity = {0.0f, 0.0f, 0.0f};
