@@ -23,7 +23,7 @@ constexpr float mount_offset[wheel_count] = {
 
 constexpr float max_wheel_speed_mps = 1.0f;
 // omni.inoで車輪速度指令をPWMへ変換する暫定係数。
-constexpr float drive_pwm_per_wheel_mps = 200.0f;
+constexpr float drive_pwm_per_wheel_mps = 300.0f;
 }
 
 struct BodyTwist { float vx, vy, w; };

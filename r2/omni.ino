@@ -6,7 +6,7 @@ constexpr int MOTOR_IN[config::wheel_count] = {6, 15, 18};
 constexpr int MOTOR_SD[config::wheel_count] = {7, 16, 17};
 // 実機確認結果: 3輪ともIN側駆動が正方向。
 constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
-constexpr int MOTOR_PWM = 50;  // 速度引き上げ後の上限。0～255
+constexpr int MOTOR_PWM = 75;  // 速度をさらに1.5倍へ引き上げた上限。0～255
 
 // 逆運動学: 機体速度 -> 各車輪の接線速度
 WheelSpeeds inverse(const BodyTwist &t) {
@@ -82,8 +82,8 @@ void omni_Init() {
 
 // 2個の測定輪は各駆動輪に対応しないため、駆動輪ごとの速度PIDには使わない。
 // 位置の閉ループ制御はmission.inoで行い、ここでは車輪速度指令を暫定PWMへ変換する。
-constexpr float DRIVE_PWM_PER_MPS = 200.0f;
-constexpr float PID_PWM_SLEW_PER_SECOND = 240.0f;
+constexpr float DRIVE_PWM_PER_MPS = 300.0f;
+constexpr float PID_PWM_SLEW_PER_SECOND = 360.0f;
 float previousMotorOutput[config::wheel_count] = {0.0f, 0.0f, 0.0f};
 WheelSpeeds targetWheelSpeed;
 BodyTwist targetBodyVelocity = {0.0f, 0.0f, 0.0f};
