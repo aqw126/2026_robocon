@@ -77,7 +77,7 @@ constexpr float MISSION_Y_TOLERANCE_M = 0.08f;
 constexpr float WALL_TOUCH_TARGET_TOLERANCE_M = 0.02f;
 constexpr float MISSION_HEADING_TOLERANCE_RAD = 5.0f * kPi / 180.0f;
 constexpr float MISSION_X_ALIGNMENT_HEADING_RAD = 0.0f;
-constexpr float MISSION_HEADING_KP = 1.5f;
+constexpr float MISSION_HEADING_KP = 0f;
 constexpr float MISSION_MAX_TURN_RATE_RADPS = 0.80f;
 
 MissionState missionState = INITIAL_GO_WAREHOUSE_C;
