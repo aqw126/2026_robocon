@@ -2,14 +2,14 @@
 
 // ============================================================
 // アーム機構のAPI
-// アームが十分に動くように500msだけモーターを回し、
+// アームを強く大きく動かすため、最大PWMで2000msモーターを回し、
 // その後はPWMを0にして停止する。
 // ============================================================
 constexpr int ARM_IN_PIN = 5;
 constexpr int ARM_PWM_PIN = 4;
 constexpr int ARM_SENSOR_PIN = 14;
-constexpr int ARM_PWM_DUTY = 200;
-constexpr uint32_t GET_CAN_DURATION_MS = 500;
+constexpr int ARM_PWM_DUTY = 255;
+constexpr uint32_t GET_CAN_DURATION_MS = 2000;
 constexpr uint32_t WATER_DURATION_MS = 1500;
 
 enum MechanismAction { MECHANISM_IDLE, MECHANISM_GET_CAN, MECHANISM_WATER };

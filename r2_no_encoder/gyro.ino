@@ -17,27 +17,46 @@ static float gyroReferenceRad = 0.0f;
 static float gyroHeadingAtReferenceRad = 0.0f;
 
 float gyro_NormalizeAngle(float angle) { while (angle > kPi) angle -= 2.0f * kPi; while (angle <= -kPi) angle += 2.0f * kPi; return angle; }
+
+bool gyro_ReadRawHeading(float &headingRad) {
+  if (!bnoAvailable) return false;
+  sensors_event_t event;
+  if (!bno.getEvent(&event, Adafruit_BNO055::VECTOR_EULER)) return false;
+  if (isnan(event.orientation.x) || isinf(event.orientation.x)) return false;
+  headingRad = BNO_YAW_SIGN * radians(event.orientation.x) + BNO_YAW_OFFSET_RAD;
+  return true;
+}
+
 void gyro_Init() {
-  Wire.begin(BNO_SDA_PIN, BNO_SCL_PIN); Wire.setClock(100000); bnoAvailable = bno.begin();
+  Wire.begin(BNO_SDA_PIN, BNO_SCL_PIN);
+  Wire.setClock(100000);
+  // アーム始動時にBNO055の電源が乱れても、I2C待ちで制御全体を止めない。
+  Wire.setTimeOut(20);
+  bnoAvailable = bno.begin();
   if (!bnoAvailable) { Serial.println("BNO055 が見つかりません。方位は0固定です。"); return; }
   bno.setExtCrystalUse(true); delay(50);
-  const imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-  gyroReferenceRad = BNO_YAW_SIGN * radians(euler.x()) + BNO_YAW_OFFSET_RAD;
+  float rawHeadingRad;
+  if (!gyro_ReadRawHeading(rawHeadingRad)) {
+    Serial.println("BNO055の初期方位を読み取れません。");
+    bnoAvailable = false;
+    return;
+  }
+  gyroReferenceRad = rawHeadingRad;
   gyroHeadingAtReferenceRad = 0.0f;
   imuHeadingRad = 0.0f;
 }
 void gyro_Update() {
   if (!bnoAvailable) return;
-  const imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+  float rawHeadingRad;
+  if (!gyro_ReadRawHeading(rawHeadingRad)) return;
   imuHeadingRad = gyro_NormalizeAngle(
-    BNO_YAW_SIGN * radians(euler.x()) + BNO_YAW_OFFSET_RAD
-    - gyroReferenceRad + gyroHeadingAtReferenceRad
+    rawHeadingRad - gyroReferenceRad + gyroHeadingAtReferenceRad
   );
 }
 void gyro_ResetHeading(float heading_rad) {
   gyroHeadingAtReferenceRad = gyro_NormalizeAngle(heading_rad);
   imuHeadingRad = gyroHeadingAtReferenceRad;
   if (!bnoAvailable) return;
-  const imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-  gyroReferenceRad = BNO_YAW_SIGN * radians(euler.x()) + BNO_YAW_OFFSET_RAD;
+  float rawHeadingRad;
+  if (gyro_ReadRawHeading(rawHeadingRad)) gyroReferenceRad = rawHeadingRad;
 }

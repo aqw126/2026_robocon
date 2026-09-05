@@ -1,7 +1,7 @@
 #include "robot_types.h"
 
 constexpr uint32_t PRINT_INTERVAL_MS = 100;
-constexpr uint32_t START_WAIT_MS = 3000;
+constexpr uint32_t START_WAIT_MS = 500;
 
 void printRobotStatus() {
   static uint32_t previousPrintMs = 0;
@@ -31,8 +31,8 @@ void setup() {
   gyro_Init();
   odometry_Init();
 
-  // 実機で成功したR2e.inoと同じく、電源投入後3秒待ってから自動開始する。
-  Serial.println("Automatic mission starts in 3 seconds");
+  // BNO055の初期値が安定するための短い待機後、自動開始する。
+  Serial.println("Automatic mission starts in 0.5 seconds");
   delay(START_WAIT_MS);
   mission_Init();
 

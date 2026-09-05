@@ -13,6 +13,7 @@
 enum MissionState {
   INITIAL_GO_WAREHOUSE_C,
   INITIAL_ARM_ACTION,
+  INITIAL_ARM_RECOVERY,
   INITIAL_TURN_FROM_C,
   INITIAL_GO_GARDEN_1,
   INITIAL_BACK_TO_PROMENADE_1,
@@ -69,6 +70,7 @@ constexpr float R2_START_HEADING_RAD = HEADING_NEGATIVE_Y_RAD;
 constexpr bool LOOP_A_AND_C = true;
 constexpr uint32_t MOVE_TIMEOUT_MS = 45000;
 constexpr uint32_t TARGET_DWELL_MS = 300;
+constexpr uint32_t ARM_POWER_RECOVERY_MS = 500;
 constexpr float MISSION_POSITION_KP = 0.80f;
 constexpr float MISSION_X_MAX_SPEED_MPS = 0.20f;
 constexpr float MISSION_ENTRY_MAX_SPEED_MPS = 0.15f;
@@ -89,6 +91,7 @@ const char *mission_StateName(uint8_t state) {
   switch (state) {
     case INITIAL_GO_WAREHOUSE_C: return "INITIAL_GO_WAREHOUSE_C";
     case INITIAL_ARM_ACTION: return "INITIAL_ARM_ACTION";
+    case INITIAL_ARM_RECOVERY: return "INITIAL_ARM_RECOVERY";
     case INITIAL_TURN_FROM_C: return "INITIAL_TURN_FROM_C";
     case INITIAL_GO_GARDEN_1: return "INITIAL_GO_GARDEN_1";
     case INITIAL_BACK_TO_PROMENADE_1: return "INITIAL_BACK_TO_PROMENADE_1";
@@ -245,6 +248,14 @@ void mission_Update() {
       omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
       if (mechanism_IsActionFinished()) {
         initialArmActionCompleted = true;
+        mission_SetState(INITIAL_ARM_RECOVERY);
+      }
+      break;
+
+    // アーム最大出力後、電源とBNO055の通信が安定するまで短く停止する。
+    case INITIAL_ARM_RECOVERY:
+      omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
+      if (millis() - missionStateEnteredMs >= ARM_POWER_RECOVERY_MS) {
         mission_SetState(INITIAL_TURN_FROM_C);
       }
       break;

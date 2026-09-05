@@ -13,6 +13,7 @@
 enum MissionState {
   INITIAL_GO_WAREHOUSE_C,
   INITIAL_ARM_ACTION,
+  INITIAL_ARM_RECOVERY,
   INITIAL_TURN_FROM_C,
   INITIAL_GO_GARDEN_1,
   INITIAL_BACK_TO_PROMENADE_1,
@@ -69,6 +70,7 @@ constexpr float R2_START_HEADING_RAD = HEADING_NEGATIVE_Y_RAD;
 constexpr bool LOOP_A_AND_C = true;
 constexpr uint32_t MOVE_TIMEOUT_MS = 45000;
 constexpr uint32_t TARGET_DWELL_MS = 300;
+constexpr uint32_t ARM_POWER_RECOVERY_MS = 500;
 constexpr float MISSION_POSITION_KP = 0.80f;
 constexpr float MISSION_X_MAX_SPEED_MPS = 0.20f;
 constexpr float MISSION_ENTRY_MAX_SPEED_MPS = 0.15f;
@@ -77,7 +79,10 @@ constexpr float MISSION_Y_TOLERANCE_M = 0.08f;
 constexpr float WALL_TOUCH_TARGET_TOLERANCE_M = 0.02f;
 constexpr float MISSION_HEADING_TOLERANCE_RAD = 5.0f * kPi / 180.0f;
 constexpr float MISSION_X_ALIGNMENT_HEADING_RAD = 0.0f;
-constexpr float MISSION_HEADING_KP = 0.0f;
+// 直進中の姿勢補正と、その場旋回のゲインを分ける。
+// 現状は直進開始時の急な左旋回を切り分けるため、直進補正だけ無効。
+constexpr float MISSION_DRIVE_HEADING_KP = 0.0f;
+constexpr float MISSION_TURN_HEADING_KP = 1.5f;
 constexpr float MISSION_MAX_TURN_RATE_RADPS = 0.80f;
 
 MissionState missionState = INITIAL_GO_WAREHOUSE_C;
@@ -89,6 +94,7 @@ const char *mission_StateName(uint8_t state) {
   switch (state) {
     case INITIAL_GO_WAREHOUSE_C: return "INITIAL_GO_WAREHOUSE_C";
     case INITIAL_ARM_ACTION: return "INITIAL_ARM_ACTION";
+    case INITIAL_ARM_RECOVERY: return "INITIAL_ARM_RECOVERY";
     case INITIAL_TURN_FROM_C: return "INITIAL_TURN_FROM_C";
     case INITIAL_GO_GARDEN_1: return "INITIAL_GO_GARDEN_1";
     case INITIAL_BACK_TO_PROMENADE_1: return "INITIAL_BACK_TO_PROMENADE_1";
@@ -154,27 +160,51 @@ bool mission_HoldForDwell() {
   return millis() - targetArrivalSinceMs >= TARGET_DWELL_MS;
 }
 
-void mission_CommandFieldVelocity(float vxField, float vyField, float targetHeadingRad) {
+void mission_CommandFieldVelocityWithHeadingKp(
+  float vxField,
+  float vyField,
+  float targetHeadingRad,
+  float headingKp
+) {
   const float headingError = mission_HeadingError(targetHeadingRad);
   const float turnRate = fabsf(headingError) <= MISSION_HEADING_TOLERANCE_RAD
     ? 0.0f
     : constrain(
-        MISSION_HEADING_KP * headingError,
+        headingKp * headingError,
         -MISSION_MAX_TURN_RATE_RADPS,
         MISSION_MAX_TURN_RATE_RADPS
       );
   omni_SetFieldVelocity(vxField, vyField, turnRate, robotPose.heading_rad);
 }
 
+void mission_CommandFieldVelocity(float vxField, float vyField, float targetHeadingRad) {
+  mission_CommandFieldVelocityWithHeadingKp(
+    vxField,
+    vyField,
+    targetHeadingRad,
+    MISSION_DRIVE_HEADING_KP
+  );
+}
+
 bool mission_TurnTo(float targetHeadingRad) {
   const float headingError = mission_HeadingError(targetHeadingRad);
   if (fabsf(headingError) <= MISSION_HEADING_TOLERANCE_RAD) {
-    mission_CommandFieldVelocity(0.0f, 0.0f, targetHeadingRad);
+    mission_CommandFieldVelocityWithHeadingKp(
+      0.0f,
+      0.0f,
+      targetHeadingRad,
+      MISSION_TURN_HEADING_KP
+    );
     return mission_HoldForDwell();
   }
 
   targetArrivalSinceMs = 0;
-  mission_CommandFieldVelocity(0.0f, 0.0f, targetHeadingRad);
+  mission_CommandFieldVelocityWithHeadingKp(
+    0.0f,
+    0.0f,
+    targetHeadingRad,
+    MISSION_TURN_HEADING_KP
+  );
   return false;
 }
 
@@ -245,6 +275,14 @@ void mission_Update() {
       omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
       if (mechanism_IsActionFinished()) {
         initialArmActionCompleted = true;
+        mission_SetState(INITIAL_ARM_RECOVERY);
+      }
+      break;
+
+    // アーム最大出力後、電源とBNO055の通信が安定するまで短く停止する。
+    case INITIAL_ARM_RECOVERY:
+      omni_SetBodyVelocity(0.0f, 0.0f, 0.0f);
+      if (millis() - missionStateEnteredMs >= ARM_POWER_RECOVERY_MS) {
         mission_SetState(INITIAL_TURN_FROM_C);
       }
       break;
