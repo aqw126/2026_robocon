@@ -109,8 +109,14 @@ void printEncoder(
   const char *name,
   int aPin,
   int bPin,
-  const EncoderSnapshot &current,
-  const EncoderSnapshot &previous
+  int32_t aEdges,
+  int32_t previousAEdges,
+  int32_t bEdges,
+  int32_t previousBEdges,
+  int32_t quadratureCount,
+  int32_t previousQuadratureCount,
+  int32_t invalidTransitions,
+  int32_t previousInvalidTransitions
 ) {
   Serial.print(name);
   Serial.print(" A(GPIO");
@@ -118,9 +124,9 @@ void printEncoder(
   Serial.print(")=");
   Serial.print(digitalRead(aPin));
   Serial.print(" edges=");
-  Serial.print(current.aEdges);
+  Serial.print(aEdges);
   Serial.print(" (+");
-  Serial.print(current.aEdges - previous.aEdges);
+  Serial.print(aEdges - previousAEdges);
   Serial.print(")");
 
   Serial.print("  B(GPIO");
@@ -128,19 +134,19 @@ void printEncoder(
   Serial.print(")=");
   Serial.print(digitalRead(bPin));
   Serial.print(" edges=");
-  Serial.print(current.bEdges);
+  Serial.print(bEdges);
   Serial.print(" (+");
-  Serial.print(current.bEdges - previous.bEdges);
+  Serial.print(bEdges - previousBEdges);
   Serial.print(")");
 
   Serial.print("  Q=");
-  Serial.print(current.quadratureCount);
+  Serial.print(quadratureCount);
   Serial.print(" dQ=");
-  Serial.print(current.quadratureCount - previous.quadratureCount);
+  Serial.print(quadratureCount - previousQuadratureCount);
   Serial.print("  invalid=");
-  Serial.print(current.invalidTransitions);
+  Serial.print(invalidTransitions);
   Serial.print(" (+");
-  Serial.print(current.invalidTransitions - previous.invalidTransitions);
+  Serial.print(invalidTransitions - previousInvalidTransitions);
   Serial.println(")");
 }
 
@@ -207,8 +213,20 @@ void loop() {
   const bool idlePrintDue = nowMs - previousPrintMs >= IDLE_PRINT_INTERVAL_MS;
 
   if (edgeChanged || idlePrintDue) {
-    printEncoder("ENC1", ENC1_A_PIN, ENC1_B_PIN, current1, previous1);
-    printEncoder("ENC2", ENC2_A_PIN, ENC2_B_PIN, current2, previous2);
+    printEncoder(
+      "ENC1", ENC1_A_PIN, ENC1_B_PIN,
+      current1.aEdges, previous1.aEdges,
+      current1.bEdges, previous1.bEdges,
+      current1.quadratureCount, previous1.quadratureCount,
+      current1.invalidTransitions, previous1.invalidTransitions
+    );
+    printEncoder(
+      "ENC2", ENC2_A_PIN, ENC2_B_PIN,
+      current2.aEdges, previous2.aEdges,
+      current2.bEdges, previous2.bEdges,
+      current2.quadratureCount, previous2.quadratureCount,
+      current2.invalidTransitions, previous2.invalidTransitions
+    );
     Serial.println();
     previousPrintMs = nowMs;
   }
