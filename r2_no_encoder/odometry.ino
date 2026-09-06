@@ -8,9 +8,9 @@ BodyTwist robotBodyVelocity = {0.0f, 0.0f, 0.0f};
 static float previousOdometryHeadingRad = 0.0f;
 
 // PWMから計算した理論速度に対する、実速度の暫定倍率。
-// 前回の暫定値0.70へ、今回のPWM増加率1.5を反映した値。
+// 実出力PWMは下の計算へ直接入るため、PWM上限を変更してもこの倍率へ重ねて反映しない。
 // まだ手前で動作が切り替わる場合は小さく、通り過ぎる場合は大きくする。
-constexpr float DRIVE_SPEED_ESTIMATE_SCALE = 1.05f;
+constexpr float DRIVE_SPEED_ESTIMATE_SCALE = 0.70f;
 
 float odometry_NormalizeAngle(float angle) {
   while (angle > kPi) angle -= 2.0f * kPi;
