@@ -10,8 +10,8 @@
 //   x=アーム上昇  y=アーム下降
 //   s=全停止（走行＋アーム）
 // ============================================================
-constexpr float MOVE_SPEED_MPS = 0.25f;     // 並進速度。0.25m/s = MOTOR_PWM上限
-constexpr float TURN_RATE_RADPS = 1.0f;     // 回転速度
+constexpr float MOVE_SPEED_MPS = 0.50f;     // 並進速度（従来の2倍）。0.25m/sが従来のPWM上限75に相当
+constexpr float TURN_RATE_RADPS = 2.0f;     // 回転速度（従来の2倍）
 constexpr uint32_t OUTPUT_INTERVAL_MS = 10;  // r2と同じ100Hzで出力更新
 
 void applyCommand(char cmd) {
@@ -20,8 +20,9 @@ void applyCommand(char cmd) {
     case 'b': omni_SetBodyVelocity(-MOVE_SPEED_MPS, 0.0f, 0.0f); break;
     case 'l': omni_SetBodyVelocity(0.0f,  MOVE_SPEED_MPS, 0.0f); break;
     case 'r': omni_SetBodyVelocity(0.0f, -MOVE_SPEED_MPS, 0.0f); break;
-    case 'o': omni_SetBodyVelocity(0.0f, 0.0f,  TURN_RATE_RADPS); break;
-    case 'p': omni_SetBodyVelocity(0.0f, 0.0f, -TURN_RATE_RADPS); break;
+    // 実機確認: 並進は正しいが回転だけ逆だったため、符号を反転している。
+    case 'o': omni_SetBodyVelocity(0.0f, 0.0f, -TURN_RATE_RADPS); break;
+    case 'p': omni_SetBodyVelocity(0.0f, 0.0f,  TURN_RATE_RADPS); break;
     case 'x': mechanism_ArmUp(); break;
     case 'y': mechanism_ArmDown(); break;
     case 's':

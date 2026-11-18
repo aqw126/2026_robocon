@@ -6,7 +6,7 @@ constexpr int MOTOR_IN[config::wheel_count] = {4, 6, 15};
 constexpr int MOTOR_SD[config::wheel_count] = {5, 7, 16};
 // 実機確認結果: 3輪ともIN側駆動が正方向。
 constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
-constexpr int MOTOR_PWM = 75;  // 速度をさらに1.5倍へ引き上げた上限。0～255
+constexpr int MOTOR_PWM = 150;  // r2の75から2倍（Bluetooth手動操作用）。0～255
 
 // 逆運動学: 機体速度 -> 各車輪の接線速度
 WheelSpeeds inverse(const BodyTwist &t) {
