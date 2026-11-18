@@ -2,8 +2,8 @@
 
 // 各モーターをIN/SDの2入力で正逆転させるHブリッジ方式。
 // 車輪順: 0=左前、1=後ろ、2=右前
-constexpr int MOTOR_IN[config::wheel_count] = {6, 15, 18};
-constexpr int MOTOR_SD[config::wheel_count] = {7, 16, 17};
+constexpr int MOTOR_IN[config::wheel_count] = {4, 6, 15};
+constexpr int MOTOR_SD[config::wheel_count] = {5, 7, 16};
 // 実機確認結果: 3輪ともIN側駆動が正方向。
 constexpr int MOTOR_DIRECTION_SIGN[config::wheel_count] = {1, 1, 1};
 constexpr int MOTOR_PWM = 75;  // 速度をさらに1.5倍へ引き上げた上限。0～255

@@ -1,11 +1,11 @@
 #include "robot_types.h"
 
 // ============================================================
-// アーム昇降。r2/mechanism.ino と同じピン・同じ上昇方向。
+// アーム昇降。上昇方向は r2/mechanism.ino と同じ。ピンは現在の配線に合わせて変更済み。
 // r2では時間制御の片方向だけだったため、Bluetooth操作用に逆方向を追加した。
 // ============================================================
-constexpr int ARM_IN_PIN = 5;
-constexpr int ARM_PWM_PIN = 4;
+constexpr int ARM_IN_PIN = 17;
+constexpr int ARM_PWM_PIN = 18;
 constexpr int ARM_PWM_DUTY = 255;
 
 void mechanism_Init() {
